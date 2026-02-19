@@ -67,8 +67,8 @@ export const createPost = async (data: CreatePostInput): Promise<PostResponse> =
 
   try {
     const completion = await openRouter.chat.send({
-      // model: "google/gemma-2-9b-it",
-      model: "x-ai/grok-4.1-fast:free",
+      model: "google/gemma-2-9b-it",
+      // model: "x-ai/grok-4.1-fast:free",
       messages: [
         {
           role: "user",
@@ -114,8 +114,6 @@ Remember:
     const raw = completion.choices[0].message.content as string;
     const result = safeJsonParse(raw);
     const imageUrl = (await generateImage(result.imageText)) as any;
-
-    console.log("RESULT", result);
 
     return {
       tags: result.postTags,

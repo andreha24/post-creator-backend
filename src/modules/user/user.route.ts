@@ -1,6 +1,6 @@
-import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { registerUserHandler } from "./user.controller";
+import { FastifyInstance } from "fastify";
+import { getUserHandler } from "./user.controller";
 
 export const userRoutes = async (fastify: FastifyInstance) => {
-  fastify.post("/", registerUserHandler);
+  fastify.get("/", getUserHandler);
 };
