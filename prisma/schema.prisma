@@ -34,9 +34,8 @@ model Post {
   title String
   text String
   tags String?
-  isPublished Boolean @default(false) @map("is_published")
+  platform String
   creator User @relation(fields: [creatorId], references: [id])
   creatorId Int @map("creator_id")
-
   @@map("posts")
 }

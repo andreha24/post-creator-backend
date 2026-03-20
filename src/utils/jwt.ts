@@ -2,7 +2,7 @@ import jwt from "jsonwebtoken";
 import { env } from "prisma/config";
 
 const JWT_SECRET = env("JWT_SECRET");
-const JWT_EXPIRES_IN = "1m";
+const JWT_EXPIRES_IN = "1h";
 
 export interface JWTPayload {
   userId: number;

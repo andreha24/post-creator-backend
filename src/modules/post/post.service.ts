@@ -3,71 +3,56 @@ import { env } from "prisma/config";
 import { CreatePostInput, PostResponse } from "./post.schema";
 import FormData from "form-data";
 import axios from "axios";
-import { jsonrepair } from "jsonrepair";
+
 const openRouter = new OpenRouter({
   apiKey: env("AI_GATEWAY_API_KEY"),
 });
 
+import prisma from "../../utils/prisma";
+import { safeJsonParse } from "../../utils/json-helpers";
+
 async function generateImage(textForImage: string) {
+  try { 
   const formData = new FormData();
-  formData.append("prompt", textForImage);
+  formData.append("prompt", 'cat on the moon');
   formData.append("style", "realistic");
   formData.append("aspect_ratio", "1:1");
   formData.append("seed", "5");
 
   formData.append(
     "negative_prompt",
-    "text, letters, typography, watermark, caption, logo, words, numbers, writing"
+    "text, letters, typography, watermark, caption, logo, words, numbers, writing",
   );
 
-  const response = await axios.post("https://api.vyro.ai/v2/image/generations", formData, {
-    headers: {
-      Authorization: process.env.IMAGINE_KEY!,
-      ...formData.getHeaders(),
+  const response = await axios.post(
+    "https://api.vyro.ai/v2/image/generations",
+    formData,
+    {
+      headers: {
+        Authorization: process.env.IMAGINE_KEY!,
+        ...formData.getHeaders(),
+      },
+      responseType: "arraybuffer",
     },
-    responseType: "arraybuffer",
-  });
+  );
 
-  const base64 = Buffer.from(response.data).toString("base64");
-  return `data:image/png;base64,${base64}`;
-}
-
-function extractJson(str: string) {
-  // Remove control characters except whitespace
-  let cleaned = str.replace(/[\x00-\x1F\x7F]/g, "");
-
-  // Remove markdown fences like ```json ... ```
-  cleaned = cleaned.replace(/```[\s\S]*?```/g, "");
-
-  // Try to find the first JSON object
-  const match = cleaned.match(/\{(?:[^{}]|(?:\{[^{}]*\}))*\}/);
-
-  if (match) return match[0];
-
-  throw new Error("JSON not found");
-}
-
-function safeJsonParse(str: string) {
-  try {
-    const extracted = extractJson(str);
-    return JSON.parse(extracted);
-  } catch (e1) {
-    try {
-      return jsonrepair(str);
-    } catch (e2) {
-      console.error("RAW AI OUTPUT:", str);
-      throw new Error("Failed to parse AI JSON");
-    }
+    const base64 = Buffer.from(response.data).toString("base64");
+    console.log("base64", base64);
+    return `data:image/png;base64,${base64}`;
+  } catch (error) {
+    console.error("Error generating image:", error);
+    throw new Error("Failed to generate image");
   }
 }
 
-export const createPost = async (data: CreatePostInput): Promise<PostResponse> => {
-  console.log("data", data);
-  const { socialMedia, topic, additionals, size, style, tags } = data;
+export const createPost = async (
+  data: CreatePostInput
+) => {
+  const { socialMedia, topic, additionals, size, style, tags, userId } = data;
 
   try {
     const completion = await openRouter.chat.send({
-      model: "google/gemma-2-9b-it",
+      model: "nvidia/nemotron-3-super-120b-a12b:free",
       // model: "x-ai/grok-4.1-fast:free",
       messages: [
         {
@@ -107,22 +92,95 @@ Remember:
 `,
         },
       ],
-      maxTokens: 200,
+      maxTokens: 800,
       stream: false,
     });
 
     const raw = completion.choices[0].message.content as string;
     const result = safeJsonParse(raw);
-    const imageUrl = (await generateImage(result.imageText)) as any;
+    console.log("result", result);
+    const imageUrl = await generateImage(result.imageText);
 
-    return {
-      tags: result.postTags,
-      title: result.postTitle,
-      text: result.postText,
-      image: imageUrl,
-    };
+    const created = await prisma.post.create({
+      data: {
+        title: result.postTitle,
+        text: result.postText,
+        image: imageUrl,
+        tags: result.postTags || null,
+        platform: socialMedia,
+        creatorId: userId,
+      },
+      select: {
+        id: true,
+        createAt: true,
+        image: true,
+        title: true,
+        text: true,
+        tags: true,
+        platform: true,
+      },
+    });
+
+    return created;
   } catch (err: any) {
     console.error("OpenRouter error:", err.message);
     throw new Error("AI generation failed");
   }
+};
+
+export const getPosts = async (userId: number) => {
+  return prisma.post.findMany({
+    where: {
+      creatorId: userId,
+    },
+    orderBy: {
+      createAt: "desc",
+    },
+    select: {
+      id: true,
+      createAt: true,
+      image: true,
+      title: true,
+      text: true,
+      tags: true,
+      platform: true,
+    },
+  });
+};
+
+export const getPostById = async (id: number) => {
+  return prisma.post.findUnique({
+    where: { id },
+    include: {
+      creator: {
+        select: {
+          id: true,
+          email: true,
+          name: true,
+        },
+      },
+    },
+  });
+};
+
+export const updatePost = async (
+  id: number,
+  data: Partial<{
+    title: string;
+    text: string;
+    image: string;
+    tags: string;
+    isPublished: boolean;
+  }>,
+) => {
+  return prisma.post.update({
+    where: { id },
+    data,
+  });
+};
+
+export const deletePost = async (id: number) => {
+  return prisma.post.delete({
+    where: { id },
+  });
 };

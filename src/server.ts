@@ -21,22 +21,17 @@ async function main() {
     secret: env("JWT_SECRET"),
   });
 
-  // Validate OAuth credentials
-  // const backendUrl = env("BACKEND_URL") || "http://localhost:5000";
-
-  const backendUrl = env("BACKEND_URL") || "http://localhost:5000";
-
   await fastify.register(oauthPlugin, {
     name: "googleOAuth2",
     credentials: {
       client: {
-        id: go,
-        secret: goo,
+        id: env("GOOGLE_CLIENT_ID"),
+        secret: env("GOOGLE_CLIENT_SECRET"),
       },
       auth: oauthPlugin.GOOGLE_CONFIGURATION,
     },
     startRedirectPath: "/auth/google",
-    callbackUri: `${backendUrl}/auth/google/callback`,
+    callbackUri: `${env("BACKEND_URL")}/auth/google/callback`,
     scope: ["profile", "email"],
   });
 
@@ -44,7 +39,7 @@ async function main() {
 
   fastify.register(userRoutes, { prefix: "/api/user" });
   fastify.register(postRoutes, { prefix: "/api/posts" });
-  fastify.register(authRoutes);
+  fastify.register(authRoutes, { prefix: "/api" });
 
   try {
     await fastify.listen({

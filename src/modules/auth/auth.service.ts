@@ -1,6 +1,11 @@
 import bcrypt from "bcrypt";
 import prisma from "../../utils/prisma";
-import { RegisterInput, LoginInput, AuthResponse, GoogleAuthResponse } from "./auth.schema";
+import {
+  RegisterInput,
+  LoginInput,
+  AuthResponse,
+  GoogleAuthResponse,
+} from "./auth.schema";
 import { generateToken } from "../../utils/jwt";
 
 export const register = async (data: RegisterInput): Promise<AuthResponse> => {
@@ -52,7 +57,9 @@ export const login = async (data: LoginInput): Promise<AuthResponse> => {
   }
 
   if (!user.password) {
-    throw new Error("This account uses Google sign-in. Please sign in with Google.");
+    throw new Error(
+      "This account uses Google sign-in. Please sign in with Google.",
+    );
   }
 
   const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -79,15 +86,14 @@ export const login = async (data: LoginInput): Promise<AuthResponse> => {
 export const findOrCreateGoogleUser = async (
   googleId: string,
   email: string,
-  name?: string
+  name?: string,
 ): Promise<GoogleAuthResponse> => {
   let isNewUser = false;
 
-  let user = await prisma.user.findUnique({
+  let user = await prisma.user.findFirst({
     where: { googleId },
   });
 
-  // 2. If not found — try by email
   if (!user) {
     const userByEmail = await prisma.user.findUnique({
       where: { email },
@@ -111,9 +117,7 @@ export const findOrCreateGoogleUser = async (
       });
       isNewUser = true;
     }
-  }
-  // 3. Update name if changed
-  else if (name && user.name !== name) {
+  } else if (name && user.name !== name) {
     user = await prisma.user.update({
       where: { id: user.id },
       data: { name },

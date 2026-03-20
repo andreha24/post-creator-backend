@@ -2,12 +2,12 @@ import { z } from "zod";
 
 const createPostSchema = z.object({
   topic: z.string(),
-  additionals: z.string(),
+  additionals: z.string().optional().default(""),
   size: z.string(),
   style: z.string(),
   socialMedia: z.string(),
-  tags: z.boolean(),
-  // userId: z.number(),
+  tags: z.boolean().optional().default(false),
+  userId: z.number(),
 });
 
 const postResponseSchema = z.object({
