@@ -15,11 +15,14 @@ async function main() {
   await fastify.register(cors, {
     origin: true,
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   });
-
+  
   await fastify.register(cookie, {
     secret: env("JWT_SECRET"),
   });
+
+  const backendUrl = env("BACKEND_URL") || "http://localhost:5000";
 
   await fastify.register(oauthPlugin, {
     name: "googleOAuth2",
@@ -30,8 +33,8 @@ async function main() {
       },
       auth: oauthPlugin.GOOGLE_CONFIGURATION,
     },
-    startRedirectPath: "/auth/google",
-    callbackUri: `${env("BACKEND_URL")}/auth/google/callback`,
+    startRedirectPath: "/api/auth/google",
+    callbackUri: `${backendUrl}/api/auth/google/callback`,
     scope: ["profile", "email"],
   });
 

@@ -11,48 +11,112 @@ const openRouter = new OpenRouter({
 import prisma from "../../utils/prisma";
 import { safeJsonParse } from "../../utils/json-helpers";
 
-async function generateImage(textForImage: string) {
-  try { 
-  const formData = new FormData();
-  formData.append("prompt", 'cat on the moon');
-  formData.append("style", "realistic");
-  formData.append("aspect_ratio", "1:1");
-  formData.append("seed", "5");
+async function pollMysticTask(
+  taskId: string,
+  maxAttempts = 30,
+  intervalMs = 3000,
+): Promise<string> {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    await new Promise((res) => setTimeout(res, intervalMs));
 
-  formData.append(
-    "negative_prompt",
-    "text, letters, typography, watermark, caption, logo, words, numbers, writing",
-  );
-
-  const response = await axios.post(
-    "https://api.vyro.ai/v2/image/generations",
-    formData,
-    {
-      headers: {
-        Authorization: process.env.IMAGINE_KEY!,
-        ...formData.getHeaders(),
+    const response = await axios.get(
+      `https://api.freepik.com/v1/ai/mystic/${taskId}`,
+      {
+        headers: {
+          "x-freepik-api-key": env("FREEPIK_API_KEY"),
+        },
       },
-      responseType: "arraybuffer",
-    },
-  );
+    );
 
-    const base64 = Buffer.from(response.data).toString("base64");
-    console.log("base64", base64);
-    return `data:image/png;base64,${base64}`;
+    const { status, generated } = response.data.data;
+
+    if (status === "COMPLETED") {
+      const imageUrl = generated?.[0];
+      if (!imageUrl)
+        throw new Error("COMPLETED but no image URL in generated[]");
+      return imageUrl;
+    }
+
+    if (status === "FAILED") {
+      throw new Error("Mystic task failed");
+    }
+  }
+
+  throw new Error(`Mystic task did not complete after ${maxAttempts} attempts`);
+}
+
+async function generateImage(textForImage: string): Promise<string> {
+  try {
+    const response = await axios.post(
+      "https://api.freepik.com/v1/ai/mystic",
+      {
+        prompt: textForImage,
+        aspect_ratio: "widescreen_16_9",
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "x-freepik-api-key": env("FREEPIK_API_KEY"),
+        },
+      },
+    );
+
+    const { task_id, status } = response.data.data;
+    console.log(`[Mystic] Task created: ${task_id}, status: ${status}`);
+
+    if (status === "COMPLETED") {
+      const imageUrl = response.data.data.generated?.[0];
+      if (imageUrl) return imageUrl;
+    }
+
+    return await pollMysticTask(task_id);
   } catch (error) {
     console.error("Error generating image:", error);
     throw new Error("Failed to generate image");
   }
 }
 
-export const createPost = async (
-  data: CreatePostInput
-) => {
+// async function generateImage(textForImage: string) {
+//   try {
+//   const formData = new FormData();
+//   formData.append("prompt", 'cat on the moon');
+//   formData.append("style", "realistic");
+//   formData.append("aspect_ratio", "1:1");
+//   formData.append("seed", "5");
+
+//   formData.append(
+//     "negative_prompt",
+//     "text, letters, typography, watermark, caption, logo, words, numbers, writing",
+//   );
+
+//   const response = await axios.post(
+//     "https://api.vyro.ai/v2/image/generations",
+//     formData,
+//     {
+//       headers: {
+//         Authorization: process.env.IMAGINE_KEY!,
+//         ...formData.getHeaders(),
+//       },
+//       responseType: "arraybuffer",
+//     },
+//   );
+
+//     const base64 = Buffer.from(response.data).toString("base64");
+//     console.log("base64", base64);
+//     return `data:image/png;base64,${base64}`;
+//   } catch (error) {
+//     console.error("Error generating image:", error);
+//     throw new Error("Failed to generate image");
+//   }
+// }
+
+export const createPost = async (data: CreatePostInput) => {
   const { socialMedia, topic, additionals, size, style, tags, userId } = data;
 
   try {
     const completion = await openRouter.chat.send({
-      model: "nvidia/nemotron-3-super-120b-a12b:free",
+      model: "arcee-ai/trinity-large-preview:free",
       // model: "x-ai/grok-4.1-fast:free",
       messages: [
         {
@@ -97,8 +161,8 @@ Remember:
     });
 
     const raw = completion.choices[0].message.content as string;
+
     const result = safeJsonParse(raw);
-    console.log("result", result);
     const imageUrl = await generateImage(result.imageText);
 
     const created = await prisma.post.create({

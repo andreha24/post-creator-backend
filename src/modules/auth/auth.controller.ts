@@ -64,7 +64,6 @@ export const googleOAuthHandler = async (request: FastifyRequest, reply: Fastify
   try {
     const token = await request.server.googleOAuth2.getAccessTokenFromAuthorizationCodeFlow(request);
 
-    // Get user info from Google
     const userInfoResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
       headers: {
         Authorization: `Bearer ${token.token.access_token}`,
@@ -77,10 +76,8 @@ export const googleOAuthHandler = async (request: FastifyRequest, reply: Fastify
 
     const googleUser = (await userInfoResponse.json()) as GoogleUserInfo;
 
-    // Find or create user
     const result = await findOrCreateGoogleUser(googleUser.id, googleUser.email, googleUser.name);
 
-    // Set token as HTTP-only cookie
     reply.setCookie("token", result.token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

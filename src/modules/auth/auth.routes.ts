@@ -3,7 +3,6 @@ import { registerHandler, loginHandler, googleOAuthHandler, logoutHandler } from
 import { registerJsonSchema, loginJsonSchema } from "./auth.schema";
 
 export const authRoutes = async (fastify: FastifyInstance) => {
-  // Register route
   fastify.post(
     "/auth/register",
     {
@@ -17,7 +16,6 @@ export const authRoutes = async (fastify: FastifyInstance) => {
     registerHandler
   );
 
-  // Login route
   fastify.post(
     "/auth/login",
     {
@@ -31,10 +29,6 @@ export const authRoutes = async (fastify: FastifyInstance) => {
     loginHandler
   );
 
-  // Google OAuth routes
-  // Note: The /google route is automatically handled by the OAuth2 plugin via startRedirectPath in server.ts
-  // Users should navigate to /auth/google to start the OAuth flow
-
   fastify.get(
     "/auth/google/callback",
     {
@@ -47,7 +41,6 @@ export const authRoutes = async (fastify: FastifyInstance) => {
     googleOAuthHandler
   );
 
-  // Logout route
   fastify.post(
     "/auth/logout",
     {
